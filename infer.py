@@ -1,5 +1,6 @@
 import time
 import torch
+import torch.nn as nn
 from torchvision.transforms.functional import to_tensor 
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from oft import KittiObjectDataset, OftNet, ObjectEncoder, visualize_objects
 def parse_args():
     parser = ArgumentParser()
 
-    parser.add_argument('model-path', type=str,
+    parser.add_argument('model_path', type=str,
                         help='path to checkpoint file containing trained model')
     parser.add_argument('-g', '--gpu', type=int, default=0,
                         help='gpu to use for inference (-1 for cpu)')
@@ -57,7 +58,11 @@ def main():
     
     # Load checkpoint
     ckpt = torch.load(args.model_path)
+
+    model = nn.DataParallel(model, [args.gpu]).cuda()
     model.load_state_dict(ckpt['model'])
+
+    model = model.module
 
     # Create encoder
     encoder = ObjectEncoder(nms_thresh=args.nms_thresh)
@@ -81,6 +86,9 @@ def main():
         pred_encoded = [t[0].cpu() for t in pred_encoded]
         detections = encoder.decode(*pred_encoded, grid.cpu())
 
+        image = image.cpu()
+        calib = calib.cpu()
+
         # Visualize predictions
         visualize_objects(image, calib, detections, ax=ax1)
         ax1.set_title('Detections')
@@ -89,7 +97,8 @@ def main():
 
         plt.draw()
         plt.pause(0.01)
-        time.sleep(0.5)
+        plt.waitforbuttonpress()
+        #time.sleep(1.5)
 
 
 if __name__ == '__main__':
