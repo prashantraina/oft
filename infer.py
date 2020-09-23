@@ -4,12 +4,13 @@ from torchvision.transforms.functional import to_tensor
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 
+import oft
 from oft import KittiObjectDataset, OftNet, ObjectEncoder, visualize_objects
 
 def parse_args():
     parser = ArgumentParser()
 
-    parser.add_argument('model-path', type=str,
+    parser.add_argument('model_path', type=str,
                         help='path to checkpoint file containing trained model')
     parser.add_argument('-g', '--gpu', type=int, default=0,
                         help='gpu to use for inference (-1 for cpu)')
@@ -51,6 +52,8 @@ def main():
     model = OftNet(num_classes=1, frontend=args.frontend, 
                    topdown_layers=args.topdown, grid_res=args.grid_res, 
                    grid_height=args.grid_height)
+
+    model = torch.nn.DataParallel(model, [args.gpu])
     if args.gpu >= 0:
         torch.cuda.set_device(args.gpu)
         model.cuda()
@@ -63,13 +66,14 @@ def main():
     encoder = ObjectEncoder(nms_thresh=args.nms_thresh)
 
     # Set up plots
-    _, (ax1, ax2) = plt.subplots(nrows=2)
+    _, (ax1, ax2, ax3, ax4) = plt.subplots(nrows=4)
     plt.ion()
 
     # Iterate over validation images
     for _, image, calib, objects, grid in dataset:
 
         # Move tensors to gpu
+        #ax1.imshow(image)
         image = to_tensor(image)
         if args.gpu >= 0:
             image, calib, grid = image.cuda(), calib.cuda(), grid.cuda()
@@ -79,6 +83,21 @@ def main():
         
         # Decode predictions
         pred_encoded = [t[0].cpu() for t in pred_encoded]
+        
+        scores, pos_offsets, dim_offsets, ang_offsets = pred_encoded
+
+        print(scores.shape, scores.dtype)
+        print(pos_offsets.shape, dim_offsets.dtype)
+
+        image = image.cpu()
+        calib = calib.cpu()
+        grid = grid.cpu() 
+        gt_encoded = encoder.encode(objects, grid)
+
+
+        oft.vis_score(scores[0], grid, ax=ax4)
+        oft.vis_score(gt_encoded[0][0], grid, ax=ax3)
+
         detections = encoder.decode(*pred_encoded, grid.cpu())
 
         # Visualize predictions
@@ -88,8 +107,9 @@ def main():
         ax2.set_title('Ground truth')
 
         plt.draw()
-        plt.pause(0.01)
-        time.sleep(0.5)
+        #plt.pause(0.01)
+        plt.waitforbuttonpress()
+        #time.sleep(0.5)
 
 
 if __name__ == '__main__':

@@ -49,7 +49,7 @@ def draw_bbox3d(obj, calib, ax, color='b'):
     ax.add_line(Line2D(*img_corners[[6, 7]].T, c=color))        # Upper right
 
 
-def visualize_objects(image, calib, objects, cmap='tab20', ax=None):
+def visualize_objects(image, calib, objects, cmap='tab20', ax=None, classes=['Car']):
 
     # Create a figure if it doesn't already exist
     if ax is None:
@@ -63,7 +63,8 @@ def visualize_objects(image, calib, objects, cmap='tab20', ax=None):
     # Visualize objects
     cmap = cm.get_cmap(cmap, len(objects))
     for i, obj in enumerate(objects):
-        draw_bbox3d(obj, calib, ax, cmap(i))
+        if classes is None or obj.classname in classes:
+            draw_bbox3d(obj, calib, ax, cmap(i))
     
     # Format axis
     ax.axis(extents)

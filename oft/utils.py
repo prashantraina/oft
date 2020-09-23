@@ -98,6 +98,31 @@ def gaussian_kernel(sigma=1., trunc=2.):
 
     return kernel2d / kernel2d.sum()
 
+def bbox_corners(obj):
+    """
+    Return the 2D
+    """
+
+    # Get corners of bounding box in object space
+    offsets = torch.tensor([
+        [-.5,  0., -.5],    # Back-left lower
+        [ .5,  0., -.5],    # Front-left lower
+        [-.5,  0.,  .5],    # Back-right lower
+        [ .5,  0.,  .5],    # Front-right lower
+        [-.5, -1., -.5],    # Back-left upper
+        [ .5, -1., -.5],    # Front-left upper
+        [-.5, -1.,  .5],    # Back-right upper
+        [ .5, -1.,  .5],    # Front-right upper
+    ])
+    corners = offsets * torch.tensor(obj.dimensions)
+    # corners = corners[:, [2, 0, 1]]
+
+    # Apply y-axis rotation
+    corners = rotate(corners, torch.tensor(obj.angle))
+
+    # Apply translation
+    corners = corners + torch.tensor(obj.position)
+    return corners
 
 def collate(batch):
 
@@ -130,10 +155,3 @@ def convert_figure(fig, tight=True):
     # Convert figure to numpy via a string array
     data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     return data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    
-
-
-
-
-
-
