@@ -74,8 +74,7 @@ def train(args, dataloader, model, encoder, optimizer, summary, epoch):
             summary.add_image('train/image', visualize_image(image), epoch)
 
             # Visualize scores
-            summary.add_image('train/score', 
-                visualize_score(pred_encoded, gt_encoded, grid), epoch)
+            summary.add_figure('train/score', visualize_score(pred_encoded[0], gt_encoded[0], grid), epoch)
             
             # Visualize uncertainty
             # summary.add_image('train/uncertainty',
@@ -124,8 +123,8 @@ def validate(args, dataloader, model, encoder, summary, epoch):
             summary.add_image('val/image', visualize_image(image), epoch)
 
             # Visualize scores
-            summary.add_image('val/score', 
-                visualize_score(pred_encoded, gt_encoded, grid), epoch)
+            summary.add_figure('val/score', 
+                visualize_score(pred_encoded[0], gt_encoded[0], grid), epoch)
 
             # Visualize uncertainty
             # summary.add_image('val/uncertainty',
@@ -172,49 +171,23 @@ def compute_loss(pred_encoded, gt_encoded, loss_weights=[1., 1., 1., 1.]):
         'total' : float(total_loss) 
     }
 
-    total_loss = score_loss
+    #total_loss = score_loss
     return total_loss, loss_dict
 
 
 def visualize_image(image):
-    fig = plt.figure('image', figsize=(8, 4))
-    plt.imshow(image[0].cpu().detach().permute(1, 2, 0).numpy())
-    plt.axis('off')
-    return oft.convert_figure(fig)
+    return image[0].cpu().detach()
 
-def visualize_score(preds, targets, grid):
-
-    # Expand tuples
-    score, pos_offsets, dim_offsets, ang_offsets = preds
-    labels, sqr_dists, gt_pos_offsets, gt_dim_offsets, gt_ang_offsets = targets
-
-    # TODO Compute 
-    # score = oft.model.loss.compute_uncertainty(score, sqr_dists, 0.25)
+def visualize_score(scores, heatmaps, grid):
 
     # Visualize score
     fig_score = plt.figure(num='score', figsize=(8, 6))
     fig_score.clear()
-    # oft.vis_score(score[0, 0], grid[0], ax=plt.subplot(121))
-    oft.vis_score(score[0, 0].sigmoid(), grid[0], ax=plt.subplot(121))
-    oft.vis_score(labels[0, 0].float(), grid[0], ax=plt.subplot(122))
 
-    return oft.convert_figure(fig_score)
+    oft.vis_score(scores[0, 0], grid[0], ax=plt.subplot(121))
+    oft.vis_score(heatmaps[0, 0], grid[0], ax=plt.subplot(122))
 
-
-def visualize_uncertainty(logvar, objects, grid):
-
-    # Visualize uncertainty
-    fig_uncert = plt.figure(num='uncertainty', figsize=(6, 6))
-    fig_uncert.clear()
-    ax = fig_uncert.gca()
-    ax = oft.vis_uncertainty(logvar[0, 0], objects[0], grid[0], ax=ax)
-    
-    # Setup colorbar
-    def cbar_fmt(x, pos):
-        return '{:.2f}'.format(math.exp(x))
-    cbar = plt.colorbar(ax.collections[0], format=FuncFormatter(cbar_fmt))
-    
-    return oft.convert_figure(fig_uncert)
+    return fig_score
 
 
 def parse_args():
@@ -380,11 +353,11 @@ def main():
         print('\n=== Beginning epoch {} of {} ==='.format(epoch, args.epochs))
         
         # Update and log learning rate
-        scheduler.step(epoch-1)
         summary.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
 
         # Train model
         train(args, train_loader, model, encoder, optimizer, summary, epoch)
+        scheduler.step()
 
         # Run validation every N epochs
         if epoch % args.val_interval == 0:
