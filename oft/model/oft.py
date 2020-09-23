@@ -48,10 +48,10 @@ class OFT(nn.Module):
 
         # Sample integral image at bounding box locations
         integral_img = integral_image(features)
-        top_left = F.grid_sample(integral_img, bbox_corners[..., [0, 1]])
-        btm_right = F.grid_sample(integral_img, bbox_corners[..., [2, 3]])
-        top_right = F.grid_sample(integral_img, bbox_corners[..., [2, 1]])
-        btm_left = F.grid_sample(integral_img, bbox_corners[..., [0, 3]])
+        top_left = F.grid_sample(integral_img, bbox_corners[..., [0, 1]], align_corners=True)
+        btm_right = F.grid_sample(integral_img, bbox_corners[..., [2, 3]], align_corners=True)
+        top_right = F.grid_sample(integral_img, bbox_corners[..., [2, 1]], align_corners=True)
+        btm_left = F.grid_sample(integral_img, bbox_corners[..., [0, 3]], align_corners=True)
 
         # Compute voxel features (ignore features which are not visible)
         vox_feats = (top_left + btm_right - top_right - btm_left) / area
