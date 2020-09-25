@@ -63,8 +63,10 @@ def visualize_objects(image, calib, objects, cmap='tab20', ax=None, classes=['Ca
     # Visualize objects
     cmap = cm.get_cmap(cmap, len(objects))
     for i, obj in enumerate(objects):
-        if classes is None or obj.classname in classes:
+        if classes is None:
             draw_bbox3d(obj, calib, ax, cmap(i))
+        elif obj.classname in classes:
+            draw_bbox3d(obj, calib, ax, cmap(classes.index(obj.classname)))
     
     # Format axis
     ax.axis(extents)

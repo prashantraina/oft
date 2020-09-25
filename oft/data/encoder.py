@@ -12,8 +12,12 @@ class ObjectEncoder(object):
         self.classnames = classnames
         self.nclass = len(classnames)
         self.pos_std = torch.tensor(pos_std)
-        self.log_dim_mean = torch.tensor(log_dim_mean)
-        self.log_dim_std = torch.tensor(log_dim_std)
+        self.pos_std_cuda = self.pos_std.cuda()
+        # assuming same dimension statistics for all classes
+        self.log_dim_mean = torch.tensor(log_dim_mean).repeat(self.nclass, 1)
+        self.log_dim_mean_cuda = self.log_dim_mean.cuda()
+        self.log_dim_std = torch.tensor(log_dim_std).repeat(self.nclass, 1)
+        self.log_dim_std_cuda = self.log_dim_std.cuda()
 
         self.sigma = sigma
         self.nms_thresh = nms_thresh
@@ -47,7 +51,7 @@ class ObjectEncoder(object):
         # Construct tensor representation of objects
         classids = torch.tensor([self.classnames.index(obj.classname) 
                                 for obj in objects], device=grid.device)
-        positions = grid.new([obj.position for obj in objects])
+        positions = grid.new_tensor([obj.position for obj in objects])
         dimensions = grid.new([obj.dimensions for obj in objects])
         angles = grid.new([obj.angle for obj in objects])
 
@@ -114,14 +118,14 @@ class ObjectEncoder(object):
         positions = positions.index_select(0, indices.view(-1)).view(C, D, W, 3)
 
         # Compute relative offsets and normalize
-        pos_offsets = (positions - centers) / self.pos_std
+        pos_offsets = (positions - centers) / self.pos_std_cuda
         return pos_offsets.permute(0, 3, 1, 2)
     
     def _encode_dimensions(self, classids, dimensions, indices):
         
         # Convert mean and std to tensors
-        log_dim_mean = self.log_dim_mean[classids]
-        log_dim_std = self.log_dim_std[classids]
+        log_dim_mean = self.log_dim_mean_cuda[classids]
+        log_dim_std = self.log_dim_std_cuda[classids]
 
         # Compute normalized log scale offset
         dim_offsets = (torch.log(dimensions) - log_dim_mean) / log_dim_std
@@ -162,7 +166,7 @@ class ObjectEncoder(object):
 
         # Decode positions, dimensions and rotations
         positions = self._decode_positions(pos_offsets, peaks, grid)
-        dimensions = self._decode_dimensions(dim_offsets, peaks)
+        dimensions = self._decode_dimensions(dim_offsets, peaks, classids)
         angles = self._decode_angles(ang_offsets, peaks)
 
         objects = list()
@@ -189,10 +193,11 @@ class ObjectEncoder(object):
         positions = pos_offsets.permute(0, 2, 3, 1) * self.pos_std + centers
         return positions[peaks]
     
-    def _decode_dimensions(self, dim_offsets, peaks):
+    def _decode_dimensions(self, dim_offsets, peaks, classids):
         dim_offsets = dim_offsets.permute(0, 2, 3, 1)
+        #print(dim_offsets.shape, classids.shape, self.log_dim_std[classids].shape)
         dimensions = torch.exp(
-            dim_offsets * self.log_dim_std + self.log_dim_mean)
+            dim_offsets * self.log_dim_std[0] + self.log_dim_mean[0])
         return dimensions[peaks]
     
     def _decode_angles(self, angle_offsets, peaks):

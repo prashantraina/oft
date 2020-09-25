@@ -22,6 +22,8 @@ from tensorboardX import SummaryWriter
 import oft
 from oft import OftNet, KittiObjectDataset, MetricDict, huber_loss, hard_neg_mining_loss, ObjectEncoder
 
+selected_classes = ['Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram']
+
 def train(args, dataloader, model, encoder, optimizer, summary, epoch):
     
     print('\n==> Training on {} minibatches'.format(len(dataloader)))
@@ -38,6 +40,11 @@ def train(args, dataloader, model, encoder, optimizer, summary, epoch):
 
         # Run network forwards
         pred_encoded = model(image, calib, grid)
+
+        pred_encoded_cpu = [t[0].detach().cpu() for t in pred_encoded]
+
+        first_prediction = pred_encoded_cpu
+        detections = encoder.decode(*first_prediction, grid[0].detach().cpu())
 
         # Encode ground truth objects
         gt_encoded = encoder.encode_batch(objects, grid)
@@ -71,7 +78,11 @@ def train(args, dataloader, model, encoder, optimizer, summary, epoch):
         if i % args.vis_iter == 0:
 
             # Visualize image
-            summary.add_image('train/image', visualize_image(image), epoch)
+            #summary.add_image('train/image', visualize_image(image), epoch)
+
+            summary.add_figure('train/detections', visualize_objects(image, calib, detections), epoch)
+
+            summary.add_figure('train/objects_gt', visualize_objects(image, calib, objects[0]), epoch)
 
             # Visualize scores
             summary.add_figure('train/score', visualize_score(pred_encoded[0], gt_encoded[0], grid), epoch)
@@ -80,7 +91,7 @@ def train(args, dataloader, model, encoder, optimizer, summary, epoch):
             # summary.add_image('train/uncertainty',
             #     visualize_uncertainty(pred_encoded[0], objects, grid), epoch)
         
-        # TODO decode and save results        
+        # TODO decode and save results   
 
     # Print epoch summary and save results
     print('==> Training epoch complete')
@@ -108,6 +119,11 @@ def validate(args, dataloader, model, encoder, summary, epoch):
             # Run network forwards
             pred_encoded = model(image, calib, grid)
 
+            pred_encoded_cpu = [t[0].detach().cpu() for t in pred_encoded]
+
+            first_prediction = pred_encoded_cpu
+            detections = encoder.decode(*first_prediction, grid[0].cpu())
+
             # Encode ground truth objects
             gt_encoded = encoder.encode_batch(objects, grid)
 
@@ -120,7 +136,11 @@ def validate(args, dataloader, model, encoder, summary, epoch):
         if i % args.vis_iter == 0:
 
             # Visualize image
-            summary.add_image('val/image', visualize_image(image), epoch)
+            #summary.add_image('val/image', visualize_image(image), epoch)
+
+            summary.add_figure('val/detections', visualize_objects(image, calib, detections), epoch)
+
+            summary.add_figure('val/objects_gt', visualize_objects(image, calib, objects[0]), epoch)
 
             # Visualize scores
             summary.add_figure('val/score', 
@@ -188,6 +208,18 @@ def visualize_score(scores, heatmaps, grid):
     oft.vis_score(heatmaps[0, 0], grid[0], ax=plt.subplot(122))
 
     return fig_score
+
+def visualize_objects(image, calib, objects):
+
+    # Visualize score
+    fig_objects = plt.figure(num='objects')
+    fig_objects.clear()
+    ax = fig_objects.gca()
+    ax.clear()
+
+    oft.visualize_objects(image[0].cpu().detach(), calib[0].cpu().detach(), objects, ax=ax, classes=selected_classes)
+
+    return fig_objects
 
 
 def parse_args():
@@ -335,13 +367,13 @@ def main():
 
     # Build model
     model = OftNet(frontend=args.frontend, topdown_layers=args.topdown,
-                   grid_res=args.grid_res, grid_height=args.grid_height)
+                   grid_res=args.grid_res, grid_height=args.grid_height, num_classes=len(selected_classes))
     if len(args.gpu) > 0:
         torch.cuda.set_device(args.gpu[0])
         model = nn.DataParallel(model, args.gpu).cuda()
 
     # Create encoder
-    encoder = ObjectEncoder()
+    encoder = ObjectEncoder(classnames=selected_classes)
 
     # Setup optimizer
     optimizer = optim.SGD(
