@@ -14,7 +14,7 @@ KITTI_CLASS_NAMES = ['Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting',
 class KittiObjectDataset(Dataset):
 
     def __init__(self, kitti_root, split='train', grid_size=(80., 80.), 
-                 grid_res=0.5, y_offset=1.74):
+                 grid_res=0.5, y_offset=1.74, start_at=0):
         
         # Get the root directory containing object detection data
         kitti_split = 'testing' if split == 'test' else 'training'
@@ -27,12 +27,14 @@ class KittiObjectDataset(Dataset):
         # Make grid
         self.grid = utils.make_grid(
             grid_size, (-grid_size[0]/2., y_offset, 0.), grid_res)
+
+        self.start_at = start_at
     
     def __len__(self):
-        return len(self.indices)
+        return len(self.indices) - self.start_at
     
     def __getitem__(self, index):
-        idx = self.indices[index]
+        idx = self.indices[self.start_at + index]
 
         # Load image
         img_file = os.path.join(self.root, 'image_2/{:06d}.png'.format(idx))

@@ -7,17 +7,19 @@ class ObjectEncoder(object):
 
     def __init__(self, classnames=['Car'], pos_std=[.5, .36, .5], 
                  log_dim_mean=[[0.42, 0.48, 1.35]], 
-                 log_dim_std=[[.085, .067, .115]], sigma=1., nms_thresh=0.05):
+                 log_dim_std=[[.085, .067, .115]], sigma=1., nms_thresh=0.05,
+                 device='cuda:0'):
         
+        device = torch.device(device)
         self.classnames = classnames
         self.nclass = len(classnames)
         self.pos_std = torch.tensor(pos_std)
-        self.pos_std_cuda = self.pos_std.cuda()
+        self.pos_std_cuda = self.pos_std.to(device)
         # assuming same dimension statistics for all classes
         self.log_dim_mean = torch.tensor(log_dim_mean).repeat(self.nclass, 1)
-        self.log_dim_mean_cuda = self.log_dim_mean.cuda()
+        self.log_dim_mean_cuda = self.log_dim_mean.to(device)
         self.log_dim_std = torch.tensor(log_dim_std).repeat(self.nclass, 1)
-        self.log_dim_std_cuda = self.log_dim_std.cuda()
+        self.log_dim_std_cuda = self.log_dim_std.to(device)
 
         self.sigma = sigma
         self.nms_thresh = nms_thresh
@@ -178,7 +180,7 @@ class ObjectEncoder(object):
         return objects
 
     def _decode_heatmaps(self, heatmaps):
-        peaks = non_maximum_suppression(heatmaps, self.sigma)
+        peaks = non_maximum_suppression(heatmaps, self.sigma, thresh=self.nms_thresh)
         scores = heatmaps[peaks]
         classids = torch.nonzero(peaks)[:, 0]
         return peaks, scores, classids

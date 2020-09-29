@@ -124,6 +124,27 @@ def bbox_corners(obj):
     corners = corners + torch.tensor(obj.position)
     return corners
 
+
+def bbox_corners_2d(obj):
+
+    # Get corners of bounding box in object space
+    offsets = torch.tensor([
+        [-.5, -.5],    # Back-left
+        [ .5,  .5],    # Front-right
+    ])
+    corners = offsets * obj.dimensions[..., [0,2]].detach().cpu()
+    # corners = corners[:, [2, 0, 1]]
+
+    # Apply y-axis rotation
+    #corners = rotate(corners, torch.tensor(obj.angle))
+
+    # Apply translation
+    corners = corners + obj.position[..., [0,2]].detach().cpu()
+
+    corners = corners.reshape(4)
+    return corners
+
+
 def collate(batch):
 
     idxs, images, calibs, objects, grids = zip(*batch)

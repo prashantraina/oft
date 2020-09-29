@@ -30,13 +30,15 @@ def draw_bbox2d(objects, color='k', ax=None):
     return ax
 
 
-def draw_bbox3d(obj, calib, ax, color='b'):
+def draw_bbox3d(obj, calib, ax, color='b', debug=False):
 
     # Get corners of 3D bounding box
     corners = utils.bbox_corners(obj)
 
     # Project into image coordinates
     img_corners = utils.perspective(calib, corners).numpy()
+    if debug:
+        print(obj.classname, obj.position)
 
     # Draw polygons
     # Front face
@@ -49,7 +51,7 @@ def draw_bbox3d(obj, calib, ax, color='b'):
     ax.add_line(Line2D(*img_corners[[6, 7]].T, c=color))        # Upper right
 
 
-def visualize_objects(image, calib, objects, cmap='tab20', ax=None, classes=['Car']):
+def visualize_objects(image, calib, objects, cmap='tab20', ax=None, classes=['Car'], debug=False):
 
     # Create a figure if it doesn't already exist
     if ax is None:
@@ -61,12 +63,12 @@ def visualize_objects(image, calib, objects, cmap='tab20', ax=None, classes=['Ca
     extents = ax.axis()
 
     # Visualize objects
-    cmap = cm.get_cmap(cmap, len(objects))
+    cmap = cm.get_cmap(cmap)
     for i, obj in enumerate(objects):
         if classes is None:
             draw_bbox3d(obj, calib, ax, cmap(i))
         elif obj.classname in classes:
-            draw_bbox3d(obj, calib, ax, cmap(classes.index(obj.classname)))
+            draw_bbox3d(obj, calib, ax, cmap(classes.index(obj.classname)), debug=debug)
     
     # Format axis
     ax.axis(extents)
